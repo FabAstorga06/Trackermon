@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#################################################################################
+
+
+NAME=trackermon
+SCRIPT_NAME=/etc/init.d/$NAME
+DESCRIPTION="Daemon created in C in order to monitor CPU, Memory and network."
+
+
+case "$1" in start)
+
+	printf "%-50s" "Starting $NAME..."
+	sudo ./home/fabastorga06/Escritorio/Trackermon/src/trckrmn
+
+#################################################################################
+
+;; status)
+	if [ "$(pidof trckrmn)" ]
+	then
+		PIDFile="/var/run/trackermon.pid"
+		# CurPID=$(<"$PIDFile")
+		echo "daemon: Trackermon is running(pid "$(<"$PIDFile") ")"
+
+	else
+		echo "daemon: Trackermon is not running"
+	fi
+
+#################################################################################
+
+;; stop)
+	PIDFile="/var/run/trackermon.pid"
+	CurPID=$(<"$PIDFile")
+
+	if [ "$(pidof trckrmn)" ]
+	then
+		printf "%-50s" "Stopping $NAME ... done "
+		kill -9 $(<"$PIDFile")
+
+	else
+		echo "daemon: Trackermon is not running"
+	fi
+
+#################################################################################
+
+;; restart)
+  	$0 stop
+  	$0 start
+
+;; *)
+        echo "Usage: $0 {status|start|stop|restart}"
+        exit 1
+esac

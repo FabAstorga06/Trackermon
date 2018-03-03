@@ -1,0 +1,278 @@
+% TEMPLATE for Usenix papers, specifically to meet requirements of
+%  USENIX '05
+% originally a template for producing IEEE-format articles using LaTeX.
+%   written by Matthew Ward, CS Department, Worcester Polytechnic Institute.
+% adapted by David Beazley for his excellent SWIG paper in Proceedings,
+%   Tcl 96
+% turned into a smartass generic template by De Clarke, with thanks to
+%   both the above pioneers
+% use at your own risk.  Complaints to /dev/null.
+% make it two column with no page numbering, default is 10 point
+
+% Munged by Fred Douglis <douglis@research.att.com> 10/97 to separate
+% the .sty file from the LaTeX source template, so that people can
+% more easily include the .sty file into an existing document.  Also
+% changed to more closely follow the style guidelines as represented
+% by the Word sample file. 
+
+% Note that since 2010, USENIX does not require endnotes. If you want
+% foot of page notes, don't include the endnotes package in the 
+% usepackage command, below.
+
+\documentclass[10pt]{article}
+\usepackage{epsfig,endnotes}
+\begin{document}
+
+%don't want date printed
+\date{}
+
+%make title bold and 14 pt font (Latex default is non-bold, 16 pt)
+\title{\Large \bf Creating a Linux Daemon using C and configuring it as a service (TrackerMon)}
+
+\author{
+{\rm Fabian Astorga}\\ 2014040808
+\and
+{\rm Javier Sancho}\\2014159997
+\and
+{\rm Oscar Ulate}\\201229559
+}
+\maketitle
+
+% Use the following at camera-ready time to suppress page numbers.
+% Comment it out when you first submit the paper for review.
+\thispagestyle{empty}
+
+
+\section{Introduction}
+\subsection{Linux daemons}
+
+A daemon is a type of program on Unix-like operating systems that runs unobtrusively in the background, rather than under the direct control of a user, waiting to be activated by the occurance of a specific event or condition \cite{daemon}.
+
+
+\subsubsection{How they work in Linux.}
+
+In linux exists three  basic type of processes:
+    
+\begin{itemize}
+    
+    \item Interactive: a user interaction with the operating system like a command in the terminal or interrups from the keyboard.
+    
+    \item Batch: Processes that are submitted from a queue and are not associated with command line, usually performing by tasks when the usage of the SO are low.
+    
+    \item The daemons are threated as processes, each processes in linux has a process identifier number (PID). All the processes are managed by the kernel.
+ 
+\end{itemize}   
+
+Most of linux daemons init when tha system boot and dies when the SO shut down. Others daemons are started when needed and run as long as they are useful.
+
+    
+\subsubsection{How they are created.}
+
+When a daemon starts up, it has to do some low-level housework to get itself ready for its real job. This involves a few steps:
+\begin{itemize}
+    \item 1 Fork off the parent process
+    \item 2 Change file mode mask (umask)
+    \item 3 Open any logs for writing
+    \item 4 Create a unique Session ID (SID)
+    \item 5 Change the current working directory to a safe place
+    \item 6 Close standard file descriptors
+\end{itemize}
+
+1- To make it truly autonomous, a child process must be created where the actual code is executed. This is known as forking.\\
+
+2-In order to write to any files (including logs) created by the daemon, the file mode mask (umask) must be changed to ensure that they can be written to or read from properly.\\
+
+3-It is recommended that you open a log file somewhere in the system for writing. This may be the only place you can look for debug information about your daemon.\\
+
+4-The child process must get a unique SID from the kernel in order to operate. \\
+    
+5- The current working directory should be changed to some place that is guaranteed to always be there. The root directory in Linux is the most recomended.\\
+
+6- Since a daemon cannot use the terminal, these file descriptors are redundant and a potential security hazard.\cite{Watson}\\
+
+\subsubsection{How they work}
+Daemons are background process that run separately from the controlling terminal and just about always have the init process as a parent process ID (though they’re not required to); they typically handle things such as network requests, hardware activity, and other wait and watch type tasks. They differ from simple background processes that are spawned in the terminal because these background process are typically bound to that terminal session, and when that terminal session ends it will send the SIGHUP message to all background processes – which normally terminates them. Because daemons are normally children of the init process, it’s more difficult to terminate them.\cite{Krauss}
+
+\subsection{SystemD and SysVinit methods}
+
+Both are system startup jobs that load the kernel and the posterior processes and services.
+
+\subsubsection{SysVinit}
+Siever \cite{Siever} book says that for decades, the SysVinit was used in the Linux distributions, the traditional model divides potential system states into multiple run levels with distinct purpose. When entering in a run level N, SysVinit runs all the commands in the directory /etc/rcN.d. An issue with SysVinit is that it runs the commands sequentially, which forces commands and daemons to have a specific order, overall if they have dependencies between them, so if one command needs that a network daemon was initiated, it should be after this one.
+
+\subsubsection{SystemD}
+Petersen \cite{Petersen} describes that Fedora replaces the System V init daemon with the systemd init daemon. Whereas the System V init would start certain services when the entire system started up or shut down using shell scripts run in sequence, systemd uses sockets for all system tasks and services. Systemd sets up sockets for daemons and coordinates between them as they start up. This allows systemd to start daemons at the same time. Should one daemon require support from another, systemd coordinates the data from their sockets, so that one daemon receives the information from another daemon that it needs to continue. This parallel start up compatibility allows very fast boot times.\newline
+
+With those descriptions of the init daemons it is clear that the main difference is that systemd can start up more than one daemon at a time. On the other hand, System V init runs all the scripts in sequence. Another difference is that systemd is more complex because the use of sockets, System V init is more simple in that aspect, it only runs the files in order. Also with this complexity systemd manage the dependencies among daemons, System V init doesn’t manage the dependencies and management should be manual.
+
+\subsection{Trackermon}
+
+The TrackerMon service will be taking care of monitoring key resources at Operating System Level like memory, CPU and network and recording the alerts in the specified log file.
+
+\subsection{CPU Monitor}
+Monitor CPU usage and generate an alert that will be appended in the trakerMon log file when the CPU threshold is equal or greater than what is specified in the configuration file.
+    
+\subsection{Memory Monitor}
+Monitor memory usage and generate an alert that will be appended in the TrackerMon log file when the Memory threshold is equal or greater than what is specified in the configuration file.
+
+\subsection{Network Monitor}
+Monitor the network inbound connections and report SYN floods when they are detected.
+Monitor the SYN connections and generate an alert when it’s detected the amount of connections are bigger than the defined threshold. This alert will be appended in the TrakerMon log file when the defined threshold for SYN connections is passed.
+
+\subsection{Config File}
+This file has the threshold values for network, cpu and memory monitors.
+The content of the file is:
+
+{\tt \small
+\begin{verbatim}
+#
+# Configuration trackermon file
+#
+
+LOG_FILE=/var/log/trackermon.log
+CPU_THRESHOLD=5%
+MEM_THRESHOLD=20%
+NET_THRESHOLD=10%
+
+\end{verbatim}
+}
+
+\section{Development environment}
+
+TrackerMon has been developed for Ubuntu 16.04, therefore, it uses systemd as the init method. It was developed using C for GNU/Linux, version 5.4.0.  The source code was written in atom text editor.
+
+For debugging and testing we used terminal commands like logger to generate the alerts that the daemon has to capture and print on the log file.
+
+
+\section{Data Structures, functions and libraries}
+
+All the code is written in  the main file, called Trackermon.c. It contains the functions of the system. Inside the file you have all the used functions:
+\begin{itemize}
+    \item struct funct\_params\_t: It is the structure that holds the thresholds of the parameters: memory, cpu and SYN connections.
+    \item init\_params: This function initializes the struct mencioned before.
+    \item delete\_spaces: This function is in charge of deleting spaces between words to the config.conf file.
+    \item parse\_config: This function is in charge of analize the config.conf file and set the parameters to the struct funct\_params\_t. It basically grabs the parameters from the disk and bring it to the memory so it can be used in the execution of the software.
+    \item set\_thresholds: Stablishes the thresholds values into the data structures needed for the algorithm.
+\end{itemize}
+
+\section{How to use Trackermon}
+\begin{center}
+    \begin{itemize}
+        \item First, download Trackermon daemon from to the computer.
+        \item Second, copy the trackermon file to the $/etc/init.d$ folder with the following command in the terminal:
+            \begin{verbatim}
+                $   sudo cp trackermon /etc/init.d/
+            \end{verbatim}
+        \item The, copy the $config.conf$ file to the $/etc/trackermon/$ folder with the following command:
+            \begin{verbatim}
+                $   sudo cp config.conf /etc/trackermon/
+            \end{verbatim}
+        \item After that, you are ready to compile Trackermon. Use the following command (Always inside the trackermon folder):
+            \begin{verbatim}
+                $   cd src
+                $   make
+            \end{verbatim}
+        \item Now you are ready to start de Trackermon daemon. Use the following command to start it:
+            \begin{verbatim}
+                $   cd /
+                $   sudo /etc/init.d/trackermon start
+            \end{verbatim}
+        \item To stop the daemon, use the command:
+            \begin{verbatim}
+                $   cd /
+                $   sudo /etc/init.d/trackermon stop
+            \end{verbatim}
+        \item To see the status of the daemon, use the command:
+            \begin{verbatim}
+                $   cd /
+                $   sudo /etc/init.d/trackermon status
+            \end{verbatim}
+        \item To restart the daemon, use the command:
+            \begin{verbatim}
+                $   cd /
+                $   sudo /etc/init.d/trackermon restart
+            \end{verbatim}
+        \item Finally, the log file is located in /var/log/trackermon.log
+    \end{itemize}
+\end{center}
+
+
+
+\section{Student activity log}
+
+
+\begin{center}
+  \begin{tabular}{|c|c|c|c|c|}
+        \hline
+    Assignment & Fabian Astorga & Javier Sancho & Oscar Ulate & Total \\
+    \hline
+    \hline
+    Daemon development & 4:00 & 0:30 & 2:00 & 6:30 \\
+    \hline
+    Config/init scripts & 1:00 & 0:00 & 0:30 & 1:30 \\
+    \hline
+    CPU monitoring & 0:00 & 1:00 & 0:30 & 1:30 \\
+    \hline
+    Memory monitoring & 2:00 & 0:00 & 0:00 & 2:00 \\
+    \hline
+    SYN Floods monitoring & 0:00 & 1:00 & 6:30 & 7:30 \\
+    \hline
+    Critical Msgs Monitor & 1:30 & 4:30 & 0:00 & 6:00 \\
+    \hline
+    Makefile, proj. management & 2:00 & 0:00 & 0:00 & 2:00 \\
+    \hline
+    Documentation & 2:00 & 5:00 & 2:00 & 9:00 \\
+    \hline
+
+  \end{tabular}
+\end{center}
+
+\section{Project final status}
+The project was completed succesfully. All of the requirements were completed. The working group didn't know many of the features used in the system, so a lot of research was needed to complete TrackerMon.
+
+\section{Conclusions}
+\begin{enumerate}
+    \item Daemons and processes are very important in every operating system, and especially in linux. Therefore it is very important to understand how them and the operating system works. With a good implementation of the daemons, an engineer can create processes in the background that doen not need any intervention from an user. This is particularly important because you can interact with the system and capture events, and mount servers from the booting of the system itself.
+    \item A very useful and necesary tool is knowing the bash commands in GNU/Linux. The easiest way to make system calls is using bash commands. Those commands talk directly to the operating system to retrieve the required information.
+    \item You can not create any daemon without knowing the Linux File System. To keep the information well organized is important, and linux knows where look specific files it needs, such as congif files. This determines where to save the files of the daemon. 
+\end{enumerate}
+
+
+
+\section{Suggestions, recommendations}
+\begin{enumerate}
+\item It is recommended to implement a modular design of the code. That, because a modular design is easier to read and debug. 
+\item It is suggested to make a previous research of the Linux File System, GNU/Linux terminal commands and system calls to the OS.
+\item It is remommended to 
+\end{enumerate}
+
+
+\begin{thebibliography}{9}
+\bibitem{daemon}
+        The Linux Information Project. Daemon Definition. lifo.org. [Online]. Available: http://www.linfo.org/daemon.html. [Accessed: 28- Feb- 2018]
+\bibitem{Watson}
+        Devin Watson. Linux Daemon Writting HOWTO. netzmafia.de. [Online]. Available: http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html. [Accessed: 26-Feb-2018]
+        
+\bibitem{Krauss}
+        Aaron Krauss .How Daemons, the Init Process, and Process Forking Work. thesocietea.org. [Online]. Available: https://thesocietea.org/2016/11/how-daemons-the-init-process-and-process-forking-work/. [Accessed: 2-Mar-2018]
+
+\bibitem{Siever}
+        Siever, E., Figgins, S., Love, R., Robbins, A. (2009) Linux in a Nutshell. Sebastopol, CA: O'Reilly.
+        
+\bibitem{Petersen}
+        Petersen, R. (2016) Fedora Linux Servers with Systemd. Alameda, CA: Surfing Turtle Press.
+
+
+\end{thebibliography}
+
+
+
+\end{document}
+
+
+
+
+
+
+
+
